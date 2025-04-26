@@ -47,7 +47,7 @@ for cin in my_list:
     driver.execute_script("arguments[0].scrollIntoView();", captcha)
     captcha.click()
     print("Waiting to enter captcha.")
-    time.sleep(15)
+    time.sleep(130)
 
     charges_info = driver.find_element(By.XPATH, '//*[@id="charges_info"]').text
     total_entries = extract_last_integer(charges_info)

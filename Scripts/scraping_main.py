@@ -3,6 +3,7 @@ import time
 from PIL import Image
 from io import BytesIO
 import os
+import selenium.common.exceptions
 from tqdm import tqdm
 from selenium import webdriver
 
@@ -89,6 +90,7 @@ def _fill_search_page(driver, from_date, to_date):
 
     captcha_text_el = driver.find_element(By.XPATH, '//*[@id="CaptchaText"]')
     driver.execute_script("arguments[0].scrollIntoView();", captcha_text_el)
+    print(f"captcha_text {captcha_text} from user")
     captcha_text_el.click()
     captcha_text_el.send_keys(captcha_text)
     captcha_text_el.send_keys(Keys.RETURN)
@@ -151,6 +153,7 @@ def _get_master_df():
             "PCT INTERNATIONAL APPLICATION NUMBER",
             "PCT INTERNATIONAL FILING DATE",
             "Application Status",
+            "Complete Specification",
         ]
     )
 
@@ -250,6 +253,7 @@ def _get_from_application_number_link(driver, application_link):
         "Applicant Country": applicants["Country"],
         "Applicant Nationality": applicants["Nationality"],
         "Abstract": abstract_row.text.strip(),
+        "Complete Specification": specification_row.text.strip(),
     }
     driver.close()
     driver.switch_to.window(driver.window_handles[0])
@@ -337,12 +341,16 @@ def _save_df(df):
 
 
 def _goto_next_page(driver):
-    link = driver.find_element(By.CSS_SELECTOR, 'button.next[name="page"]')
-    link.click()
-    wait = WebDriverWait(driver, 10)
-    p = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "Selected")))
-    current_page = int(p.text)
-    print("Current page: ", current_page)
+    try:        
+        link = driver.find_element(By.CSS_SELECTOR, 'button.next[name="page"]')
+        link.click()
+        wait = WebDriverWait(driver, 10)
+        p = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "Selected")))
+        current_page = int(p.text)
+        print("Current page: ", current_page)
+    except selenium.common.exceptions.StaleElementReferenceException:
+        print("Stale element reference. Retrying...")
+        _goto_next_page(driver)  # Retry the function
 
 
 if __name__ == "__main__":
