@@ -18,6 +18,8 @@ import datetime as dt
 import pandas as pd
 
 import argparse
+from selenium.common.exceptions import NoSuchElementException
+import time
 
 
 def _parse_args():
@@ -158,26 +160,55 @@ def _get_master_df():
     )
 
 
-def _get_from_main_page(driver, row):
-    (
-        application_number_cell,
-        title_cell,
-        application_date_cell,
-        status_cell,
-        status_link_cell,
-    ) = row.find_elements(By.CSS_SELECTOR, "td")
-    application_link = application_number_cell.find_element(By.CSS_SELECTOR, "button")
-    status_link = status_link_cell.find_element(By.CSS_SELECTOR, "button")
-    return (
-        {
-            "Application Number": application_link.text,
-            "Title": title_cell.text,
-            "Application Date": application_date_cell.text,
-            "Status": status_cell.text,
-        },
-        application_link,
-        status_link,
-    )
+def _get_from_main_page(driver, row, retries=3, delay=2):
+    """
+    Extracts data from the main page for a given row.
+    Retries if NoSuchElementException is encountered.
+
+    Args:
+        driver: Selenium WebDriver instance.
+        row: WebElement representing a row in the table.
+        retries: Number of retries in case of NoSuchElementException.
+        delay: Delay (in seconds) between retries.
+
+    Returns:
+        A tuple containing:
+        - A dictionary with extracted data.
+        - The application link WebElement.
+        - The status link WebElement.
+    """
+    for attempt in range(retries):
+        try:
+            # Locate the cells in the row
+            (
+                application_number_cell,
+                title_cell,
+                application_date_cell,
+                status_cell,
+                status_link_cell,
+            ) = row.find_elements(By.CSS_SELECTOR, "td")
+
+            # Locate the application and status links
+            application_link = application_number_cell.find_element(By.CSS_SELECTOR, "button")
+            status_link = status_link_cell.find_element(By.CSS_SELECTOR, "button")
+
+            # Return the extracted data and links
+            return (
+                {
+                    "Application Number": application_link.text,
+                    "Title": title_cell.text,
+                    "Application Date": application_date_cell.text,
+                    "Status": status_cell.text,
+                },
+                application_link,
+                status_link,
+            )
+        except NoSuchElementException as e:
+            print(f"Attempt {attempt + 1} failed: {e}. Retrying...")
+            time.sleep(delay)
+
+    # If all retries fail, raise the exception
+    raise NoSuchElementException("Failed to locate elements in the row after multiple retries.")
 
 
 def _get_from_application_number_link(driver, application_link):
@@ -344,7 +375,7 @@ def _goto_next_page(driver):
     try:        
         link = driver.find_element(By.CSS_SELECTOR, 'button.next[name="page"]')
         link.click()
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 15)
         p = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "Selected")))
         current_page = int(p.text)
         print("Current page: ", current_page)
